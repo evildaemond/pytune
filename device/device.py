@@ -16,7 +16,12 @@ from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes, serialization
 from roadtools.roadlib.deviceauth import DeviceAuthentication
 from roadtools.roadlib.auth import Authentication
-from utils.utils import prtauth, renew_token, token_renewal_for_enrollment, create_pfx, extract_pfx, get_devicetoken
+import json
+from utils.utils import prtauth, renew_token, token_renewal_for_enrollment, create_pfx, extract_pfx, get_devicetoken, write_file
+from rich import print
+from rich.padding import Padding
+
+outdir = os.path.join(os.getcwd(), 'loot')
 
 class Device:
     def __init__(self, logger, os, device_name, deviceid, uid, tenant, prt, session_key, proxy):
@@ -58,7 +63,7 @@ class Device:
 
         certpath = f'{self.device_name}_cert.pem'
         keypath = f'{self.device_name}_key.pem'
-        self.device_auth.register_device(
+        valid = self.device_auth.register_device(
             access_token=access_token,
             jointype=0, # 0 : join, 4 : register
             certout=certpath,
@@ -68,6 +73,11 @@ class Device:
             os_version=self.os_version,
             deviceticket=deviceticket
             )
+        
+        # Catch registration failure
+        if valid == False:
+            self.logger.error(f'Device registration failed.')
+            return
         
         pfxpath = f'{self.device_name}.pfx'
         create_pfx(certpath, keypath, pfxpath)
@@ -239,11 +249,10 @@ class Device:
         
         if response.status_code == 200 and file_name_hash:
             filename = os.path.splitext(file_name_hash)[0]
-            with open(filename, 'wb') as f:
-                f.write(response.content)
-            self.logger.success(f'successfully downloaded to {filename}')
+            write_file(filepath=os.path.join(outdir, "apps"), filename=filename, content=response.content)
+            self.logger.success(f'Successfully downloaded to {filename}')
         else:
-            self.logger.error(f'failed to download msi file')
+            self.logger.error(f'Failed to download msi file')
 
     def checkin(self, mdmpfx):
         certpath = 'pytune_mdm.crt'
@@ -281,20 +290,36 @@ class Device:
             msgid+=1
             syncml_data = self.generate_syncml_response(msgid, sessionid, imei, cmds)
 
-        self.logger.info(f'checkin ended!')
+        self.logger.info(f'Checkin ended!')
+
         if len(profiles) > 0:
-            self.logger.alert(f'maybe these are configuration profiles:')
+            self.logger.alert(f'Maybe these are configuration profiles:')
             for profile in profiles:
-                if 'WlanXml' in profile["LocURI"]:
-                    print(f'- {profile["LocURI"]}:')
-                    print(xmltodict.parse(profile["Data"]))
-                else:
-                    print(f'- {profile["LocURI"]}: {profile["Data"]}')
-        
+                LocationURI = profile["LocURI"]
+                filename = f'profile_{re.sub(r"[^a-zA-Z0-9]", "_", LocationURI)}.txt'
+                data = profile["Data"]
+                write_file(filepath=os.path.join(outdir, "profiles"), filename=filename, content=data)
+
+                print(f'LocationURI: {LocationURI}')
+
+                if 'WlanXml' in LocationURI or data.strip().startswith('<'):
+                    try:
+                        data = xmltodict.parse(data)
+                        data = json.dumps(data, indent=4)
+                    except:
+                        pass
+                elif data.strip().startswith('{'):
+                    try:
+                        data = json.dumps(json.loads(data), indent=4)
+                    except:
+                        pass
+
+                print(Padding(f'{data}', pad=(0, 0, 0, 4)))
+
         if len(msi_urls):
-            self.logger.alert(f'we found line-of-business app...')
+            self.logger.alert(f'We found line-of-business app...')
             for msi_url in msi_urls:
-                self.logger.info(f'downloading msi file from {msi_url}')
+                self.logger.info(f'Downloading msi file from {msi_url}')
                 self.download_msi(msi_url, certpath, keypath)
 
 
@@ -500,7 +525,7 @@ class Device:
                     locuri = cmd["Item"]["Target"]["LocURI"]                    
                     data = self.get_syncml_data(locuri)
                     if data:
-                        print(f' [*] sending data for {locuri}')
+                        self.logger.debug(f'sending data for {locuri}')
                         result = {
                             "CmdID": str(cmdid+1),
                             "MsgRef": str(msgref),
@@ -518,7 +543,7 @@ class Device:
                         syncml_data["SyncML"]["SyncBody"]["Results"].append(result)
                     else:
                         status["Data"] = "404"
-                        print(f' [*] no data found for {locuri}')
+                        self.logger.debug(f'no data found for {locuri}')
                     cmdid += 2
                 else:
                     cmdid += 1

