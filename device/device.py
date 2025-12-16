@@ -47,7 +47,7 @@ class Device:
         self.device_auth.auth.proxies = proxy
         self.device_auth.auth.verify = False
 
-    def entra_join(self, username, password, access_token, deviceticket):
+    def entra_join(self, username, password, access_token, deviceticket, join_type: str='join'):
         devicereg = 'urn:ms-drs:enterpriseregistration.windows.net'
         if access_token:
             claims = jwt.decode(access_token, options={"verify_signature":False}, algorithms=['RS256'])
@@ -65,7 +65,7 @@ class Device:
         keypath = f'{self.device_name}_key.pem'
         valid = self.device_auth.register_device(
             access_token=access_token,
-            jointype=0, # 0 : join, 4 : register
+            jointype=0 if join_type == 'join' else 4, # 0 : join, 4 : register
             certout=certpath,
             privout=keypath, 
             device_type=self.os,
@@ -592,3 +592,4 @@ class Device:
             outfile.write(pfx)
 
         return
+
