@@ -63,16 +63,22 @@ class Pytune:
             device = Linux(self.logger, os, device_name, deviceid, uid, tenant, prt, session_key, proxy)
         return device
 
-    def entra_join(self, username, password, access_token, tokenfile, device_name, os, deviceticket, proxy):
+    def entra_join(self, username, password, access_token, tokenfile, device_name, os, deviceticket, proxy, register: bool=False):
         device = self.new_device(os, device_name, None, None, None, None, proxy)
 
+        # Modify the join type between register and join
+        if register:
+            join_type = 'register'
+        else:
+            join_type = 'join'
+     
         if tokenfile:
             access_token = self.load_tokenfile(tokenfile).get('accessToken')
 
         if access_token is None:
             password = self.get_password(password)
 
-        device.entra_join(username, password, access_token, deviceticket)
+        device.entra_join(username, password, access_token, deviceticket, join_type)
         return
 
     def entra_delete(self, certpfx, proxy):
@@ -141,7 +147,8 @@ def main():
     entra_join_parser.add_argument('-d', '--device_name', required=True, action='store', help='device name')
     entra_join_parser.add_argument('-o', '--os', required=True, action='store', help='os')
     entra_join_parser.add_argument('-D', '--deviceticket', required=False, action='store', help='device ticket')
-    
+    entra_join_parser.add_argument('--register', action='store_true', help='register device instead of join')
+
     entra_delete_parser = subparsers.add_parser('entra_delete', help='delete device from Entra ID')
     entra_delete_parser.add_argument('-c', '--certpfx', required=True, action='store', help='device cert pfx path')
 
@@ -202,7 +209,7 @@ def main():
     pytune = Pytune(logger)
 
     if args.command == 'entra_join':
-        pytune.entra_join(args.username, args.password, args.access_token, args.tokenfile, args.device_name, args.os, args.deviceticket, proxy)
+        pytune.entra_join(args.username, args.password, args.access_token, args.tokenfile, args.device_name, args.os, args.deviceticket, proxy, args.register)
     if args.command == 'entra_delete':
         pytune.entra_delete(args.certpfx, proxy)
     if args.command == 'enroll_intune':
