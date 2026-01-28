@@ -30,12 +30,22 @@ class Windows(Device):
     def get_enrollment_token(self, refresh_token):
         if self.prt:
             access_token, _ = prtauth(
-                self.prt, self.session_key, '29d9ed98-a469-4536-ade2-f981bc1d605e', 'https://enrollment.manage.microsoft.com/', 'ms-aadj-redir://auth/mdm', self.proxy
+                self.prt, 
+                self.session_key, 
+                '29d9ed98-a469-4536-ade2-f981bc1d605e', 
+                'https://enrollment.manage.microsoft.com/', 
+                'ms-aadj-redir://auth/mdm', 
+                self.proxy
                 )
         else:
-            access_token, _ = renew_token(refresh_token, '9ba1a5c7-f17a-4de9-a1f1-6178c8d51223', 'openid offline_access profile d4ebce55-015a-49b5-a083-c84d1797ae8c/.default', self.proxy)
+            access_token, _ = renew_token(
+                refresh_token, 
+                '9ba1a5c7-f17a-4de9-a1f1-6178c8d51223', 
+                'openid offline_access profile d4ebce55-015a-49b5-a083-c84d1797ae8c/.default', 
+                self.proxy
+            )
         return access_token
-    
+
     def replace_string(self, flag, keyword, str, replace_str):  
         if flag:
             str = str.replace(keyword, replace_str)
@@ -43,107 +53,189 @@ class Windows(Device):
             str = str.replace(keyword, '')
         return str
 
+    def create_device_enrollment_soap_request(self, enrollment_url, token_b64, csr_pem, ContextItem):
+        # While ZEEP Could be used, at this stage it has been a headache, so I am skipping it for now and just crafting the XML myself, it's somewhat better than it was hardcoded before. 
+        xmlnamespaces = {
+            'xmlns:s':"http://www.w3.org/2003/05/soap-envelope",
+            'xmlns:a':"http://www.w3.org/2005/08/addressing",
+            'xmlns:u':"http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd",
+            'xmlns:wsse':"http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd",
+            'xmlns:wst':"http://docs.oasis-open.org/ws-sx/ws-trust/200512",
+            'xmlns:ac':"http://schemas.xmlsoap.org/ws/2006/12/authorization"
+        }
+
+        # Create the primary envelope
+        soap_envelope = ET.Element("s:Envelope", xmlnamespaces)
+
+        # Create our Soap Headers
+        action = {
+            "tag": "a:Action",
+            "attribute": 's:mustUnderstand="1"',
+            "value": "http://schemas.microsoft.com/windows/pki/2009/01/enrollment/RST/wstep"
+            }
+
+        MessageID = {
+            "tag": "a:MessageID",
+            "value": f"urn:uuid:{str(uuid.uuid4())}"
+            }
+
+        ReplyTo = {
+            "tag": "a:ReplyTo",
+            'value': {
+                "tag": "a:Address",
+                "value": "http://www.w3.org/2005/08/addressing/anonymous"
+                }
+            }
+
+        to = {
+            "tag": "a:To",
+            "attribute": 's:mustUnderstand="1"',
+            "value": f"{enrollment_url}"
+            }
+
+        BinarySecurityToken = {
+            "tag": "wsse:BinarySecurityToken",
+            # [MS-DVRE] - v20180912 page 17/37 shows ValueType and EncodingType as static for this token
+            "attribute": f'ValueType="urn:ietf:params:oauth:token-type:jwt" EncodingType="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd#base64binary"',
+            "value": f"{token_b64}"
+            }
+
+        security = {
+            "tag": "wsse:Security",
+            "attribute": 's:mustUnderstand="1"',
+            "value": BinarySecurityToken
+            }
+
+        soap_header = ET.Element("s:Header")
+
+        for i in [action] + [MessageID] + [ReplyTo] + [to] + [security]:
+            tag = i["tag"]
+            attribute = i.get("attribute", None)
+            attributes = {}
+            if (attribute is not None) and ('=' in attribute):
+                for part in attribute.split(' '):
+                    if '=' in part:
+                        key, val = part.split('=')
+                        attributes[key] = val.strip('"')
+            value = i["value"]
+            if isinstance(value, dict):
+                temp_element = ET.Element(tag, attrib=attributes)
+
+                #sub_element = ET.SubElement(soap_header, tag, attrib={} if not attribute else {attribute.split('=')[0]: attribute.split('=')[1].strip('"')})
+                sub_tag = value["tag"]
+                sub_attribute = value.get("attribute", None)
+                sub_attributes = {}
+                if (sub_attribute is not None) and ('=' in sub_attribute):
+                    for part in sub_attribute.split(' '):
+                            if '=' in part:
+                                key, val = part.split('=')
+                                sub_attribute = f'{key}={val.strip("\"")}'
+                                sub_attributes[key] = val.strip('"')
+
+                sub_value = value["value"]
+
+                ET.SubElement(temp_element, sub_tag, attrib={} if not sub_attribute else sub_attributes).text = sub_value
+                soap_header.append(temp_element)
+            else:
+                ET.SubElement(soap_header, tag, attrib={} if not attribute else attributes).text = value
+
+        # Append our final Header to the Soap Envelope
+        soap_envelope.append(soap_header)
+
+        # Create our Soap Body
+        TokenType = {
+            "tag" : "wst:TokenType",
+            "value" : "http://schemas.microsoft.com/5.0.0.0/ConfigurationManager/Enrollment/DeviceEnrollmentToken"
+            }
+
+        requestType = {
+            "tag" : "wst:RequestType",
+            # The value here is the Issuer request, according to https://specterops.io/blog/2025/07/30/entra-connect-attacker-tradecraft-part-3/, you are able to modify this to Recovery and create a new MDM cert without issuing a new certificate
+            # The information for this type can be found in https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-mde2/
+            "value" : "http://docs.oasis-open.org/ws-sx/ws-trust/200512/Issue"
+            }
+
+        BinarySecurityToken = {
+            "tag" : "wsse:BinarySecurityToken",
+            "attribute" : 'ValueType="http://schemas.microsoft.com/windows/pki/2009/01/enrollment#PKCS10" EncodingType="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd#base64binary"',
+            "value" : f"{csr_pem}"
+            }
+
+        body = ET.Element("s:Body")
+        RequestSecurityToken = ET.Element("wst:RequestSecurityToken")
+
+        for i in [TokenType, requestType, BinarySecurityToken]:
+            tag = i["tag"]
+            attribute = i.get("attribute", None)
+            attributes = {}
+            if (attribute is not None) and ('=' in attribute):
+                for part in attribute.split(' '):
+                    if '=' in part:
+                        key, val = part.split('=')
+                        attributes[key] = val.strip('"')
+            value = i["value"]
+            ET.SubElement(RequestSecurityToken, tag, attrib=attributes).text = value
+
+        # Create AdditionalContext Attribute with all keys/values from ContextItem
+        AdditionalContext = {
+            "tag" : "ac:AdditionalContext",
+            "attribute" : 'xmlns="http://schemas.xmlsoap.org/ws/2006/12/authorization"'
+        }
+
+        AdditionalContextItems = ET.Element("ac:AdditionalContext", {"xmlns": "http://schemas.xmlsoap.org/ws/2006/12/authorization"})
+
+        for key, val in ContextItem.items():
+            context_item = ET.SubElement(AdditionalContextItems, "ac:ContextItem", attrib={"Name": key})
+            ET.SubElement(context_item, "ac:Value").text = str(val)
+        
+        # Append AdditionalContext to RequestSecurityToken then RequestSecurityToken to Body
+        RequestSecurityToken.append(AdditionalContextItems)
+        body.append(RequestSecurityToken)
+
+        # Append our final Body to the Soap Envelope
+        soap_envelope.append(body)
+        
+        # Print out the final XML
+        #ET.dump(soap_envelope)
+
+        return ET.tostring(soap_envelope, encoding='utf-8').decode('utf-8')
+
     def send_enroll_request(self, enrollment_url, csr_pem, csr_token, ztdregistrationid,  is_device, is_hejd):
         deviceid = None
         if self.deviceid:
             deviceid = self.deviceid.replace('-', '')
-            
-        token_b64 = base64.b64encode(csr_token.encode('utf-8')).decode('utf-8')
-        message_id = str(uuid.uuid4())
-        body = f'''
-    <s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:a="http://www.w3.org/2005/08/addressing" xmlns:u="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd" xmlns:wst="http://docs.oasis-open.org/ws-sx/ws-trust/200512" xmlns:ac="http://schemas.xmlsoap.org/ws/2006/12/authorization">
-        <s:Header>
-            <a:Action s:mustUnderstand="1">http://schemas.microsoft.com/windows/pki/2009/01/enrollment/RST/wstep</a:Action>
-            <a:MessageID>urn:uuid:{message_id}</a:MessageID>
-            <a:ReplyTo>
-                <a:Address>http://www.w3.org/2005/08/addressing/anonymous</a:Address>
-            </a:ReplyTo>
-            <a:To s:mustUnderstand="1">{enrollment_url}</a:To>
-            <wsse:Security s:mustUnderstand="1">
-                <wsse:BinarySecurityToken ValueType="urn:ietf:params:oauth:token-type:jwt" EncodingType="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd#base64binary">{token_b64}</wsse:BinarySecurityToken>
-            </wsse:Security>
-        </s:Header>
-        <s:Body>
-            <wst:RequestSecurityToken>
-                <wst:TokenType>http://schemas.microsoft.com/5.0.0.0/ConfigurationManager/Enrollment/DeviceEnrollmentToken</wst:TokenType>
-                <wst:RequestType>http://docs.oasis-open.org/ws-sx/ws-trust/200512/Issue</wst:RequestType>
-                <wsse:BinarySecurityToken ValueType="http://schemas.microsoft.com/windows/pki/2009/01/enrollment#PKCS10" EncodingType="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd#base64binary">{csr_pem}</wsse:BinarySecurityToken>
-                <ac:AdditionalContext xmlns="http://schemas.xmlsoap.org/ws/2006/12/authorization">
-                    <ac:ContextItem Name="UXInitiated">
-                        <ac:Value>true</ac:Value>
-                    </ac:ContextItem>
-                    REPLACE_HEJD
-                    <ac:ContextItem Name="HWDevID">
-                        <ac:Value>0000000000000000000000000000000000000000000000000000000000000000</ac:Value>
-                    </ac:ContextItem>
-                    <ac:ContextItem Name="AzVMIAMExtensionJoin">
-                        <ac:Value>{is_device}</ac:Value>
-                    </ac:ContextItem>
-                    <ac:ContextItem Name="BootstrapDomainJoin">
-                        <ac:Value>true</ac:Value>
-                    </ac:ContextItem>
-                    REPLACE_MDM_ONLY_ENROLL
-                    <ac:ContextItem Name="NotInOobe">
-                        <ac:Value>false</ac:Value>
-                    </ac:ContextItem>
-                    REPLACE_ZEROTOUCH_PROVISIONING
-                    <ac:ContextItem Name="Locale">
-                        <ac:Value>en-US</ac:Value>
-                    </ac:ContextItem>
-                    <ac:ContextItem Name="TargetedUserLoggedIn">
-                        <ac:Value>false</ac:Value>
-                    </ac:ContextItem>
-                    <ac:ContextItem Name="EnrollmentData">
-                        <ac:Value>null</ac:Value>
-                    </ac:ContextItem>
-                    <ac:ContextItem Name="OSEdition">
-                        <ac:Value>72</ac:Value>
-                    </ac:ContextItem>
-                    <ac:ContextItem Name="DeviceName">
-                        <ac:Value>{self.device_name}</ac:Value>
-                    </ac:ContextItem>
-                    <ac:ContextItem Name="MAC">
-                        <ac:Value>00-00-00-00-00-00</ac:Value>
-                    </ac:ContextItem>     
-                    <ac:ContextItem Name="DeviceID">
-                        <ac:Value>{deviceid}</ac:Value>
-                    </ac:ContextItem>
-                    <ac:ContextItem Name="EnrollmentType">
-                        <ac:Value>Device</ac:Value>
-                    </ac:ContextItem>
-                    <ac:ContextItem Name="DeviceType">
-                        <ac:Value>CIMClient_Windows</ac:Value>
-                    </ac:ContextItem>
-                    <ac:ContextItem Name="OSVersion">
-                        <ac:Value>{self.os_version}</ac:Value>
-                    </ac:ContextItem>
-                    <ac:ContextItem Name="ApplicationVersion">
-                        <ac:Value>{self.os_version}</ac:Value>
-                    </ac:ContextItem>
-                </ac:AdditionalContext>
-            </wst:RequestSecurityToken>
-        </s:Body>
-    </s:Envelope>
-    '''
-        replace_str = f'''
-            <ac:ContextItem Name="OfflineAutoPilotEnrollmentCorrelator">
-                <ac:Value>12345678-1E13-45F3-BF82-A3E8C5B59EAC</ac:Value>
-            </ac:ContextItem>
-            '''
-        body = self.replace_string((not self.deviceid), 'REPLACE_MDM_ONLY_ENROLL', body, replace_str)
 
-        replace_str = f'''
-            <ac:ContextItem Name="ZeroTouchProvisioning">
-                <ac:Value>{ztdregistrationid}</ac:Value>
-            </ac:ContextItem>
-            '''        
-        body = self.replace_string(ztdregistrationid, 'REPLACE_ZEROTOUCH_PROVISIONING', body, replace_str)        
-        replace_str = f'''
-            <ac:ContextItem Name="DomainName">
-                <ac:Value>evil.local</ac:Value>
-            </ac:ContextItem>
-            '''
-        body = self.replace_string(is_hejd, 'REPLACE_HEJD', body, replace_str)
+        token_b64 = base64.b64encode(csr_token.encode('utf-8')).decode('utf-8')
+        # New testing for enrollment request to use an XML build instead of hardcoded string
+        context_items = {
+            "ApplicationVersion":f"{self.os_version}",
+            "AzVMIAMExtensionJoin":f":{is_device}",
+            "BootstrapDomainJoin":"true",
+            "DeviceID":f"{deviceid}",
+            "DeviceName":f"{self.device_name}",
+            "DeviceType":"CIMClient_Windows",
+            "EnrollmentData":"null",
+            "EnrollmentType":"Device",
+            "HWDevID":"0000000000000000000000000000000000000000000000000000000000000000",
+            "Locale":"en-US",
+            "MAC":"00-00-00-00-00-00",
+            "NotInOobe":"false",
+            "OSEdition":"72",
+            "OSVersion":f"{self.os_version}",
+            "TargetedUserLoggedIn":"false",
+            "UXInitiated":"true",
+        }
+
+        if (not self.deviceid):
+            context_items.append({"OfflineAutoPilotEnrollmentCorrelator":"12345678-1E13-45F3-BF82-A3E8C5B59EAC"})
+        if ztdregistrationid:
+            context_items.append({"ZeroTouchProvisioning":f"{ztdregistrationid}"})
+        if is_hejd:
+            context_items.append({"DomainName":"evil.local"})
+
+        body = self.create_device_enrollment_soap_request(enrollment_url, token_b64, csr_pem, context_items)
+
+        # Send POST Request to Enrollment URL
         response = requests.post(
             url=enrollment_url,
             data=body,
@@ -151,26 +243,32 @@ class Windows(Device):
             proxies=self.proxy,
             verify=False
         )
+
+        # Response Parsing
         self.logger.debug(f'received response for enrollment request:\n{response.content.decode()}')
         xml = ET.fromstring(response.content.decode('utf-8'))
+
+        #print(xml)
+
         binary_security_token = xml.find('.//{http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd}BinarySecurityToken').text
+
         return base64.b64decode(binary_security_token).decode('utf-8')
 
     def generate_initial_syncml(self, sessionid, imei):
         syncml_data = self.generate_syncml_header(1, sessionid, imei)
 
-        syncml_data["SyncML"]["SyncBody"] = {             
+        syncml_data["SyncML"]["SyncBody"] = { 
             "Alert": [],
             "Replace": {
                 "CmdID": "6",
-                "Item": [                             
+                "Item": [
                     {
                         "Source": {"LocURI": "./DevInfo/DevId"},
                         "Data": f"imei:{imei}",
                     },
                     {
                         "Source": {"LocURI": "./DevInfo/Man"}, 
-                        "Data": self.get_syncml_data("./DevInfo/Man")["Data"]                           
+                        "Data": self.get_syncml_data("./DevInfo/Man")["Data"]
                     },
                     {
                         "Source": {"LocURI": "./DevInfo/Mod"},
@@ -188,11 +286,11 @@ class Windows(Device):
             },
             "Final": None
             }          
-          
-        if self.hwhash:                            
+
+        if self.hwhash:
                 syncml_data["SyncML"]["SyncBody"]["Alert"] = [
-                     {"CmdID": "2", "Data": "1201"},
-                     {"CmdID": "3", "Data": "1224", "Item": {"Meta": {"Type": {"@xmlns": "syncml:metinf", "#text": "com.microsoft/MDM/LoginStatus"}},"Data": {"@xmlns": "SYNCML:SYNCML1.2", "#text":"others"}}},
+                    {"CmdID": "2", "Data": "1201"},
+                    {"CmdID": "3", "Data": "1224", "Item": {"Meta": {"Type": {"@xmlns": "syncml:metinf", "#text": "com.microsoft/MDM/LoginStatus"}},"Data": {"@xmlns": "SYNCML:SYNCML1.2", "#text":"others"}}},
                     {"CmdID": "4", "Data": "1224", "Item": {"Meta": {"Type": {"@xmlns": "syncml:metinf", "#text": "com.microsoft/MDM/BootstrapSync"}},"Data": {"@xmlns": "SYNCML:SYNCML1.2", "#text":"device"}}},
                     {"CmdID": "5", "Data": "1224", "Item": {"Meta": {"Type": {"@xmlns": "syncml:metinf", "#text": "com.microsoft/MDM/OdjSync"}},"Data": {"@xmlns": "SYNCML:SYNCML1.2", "#text":"device"}}}]
 
@@ -204,44 +302,27 @@ class Windows(Device):
         jst = timezone(offset)
         dt_with_tz = now.astimezone(jst)
         formatted_date = dt_with_tz.isoformat()
-        data = {
-            f"./DevInfo/DmV": {
-                "Format": "int",
-                "Data": '1.3'
-            },
-            f"./Vendor/MSFT/NodeCache/MS%20DM%20Server": {
-                "Format": "chr",
-                "Data": 'CacheVersion/Nodes/ChangedNodes/ChangedNodesData'
-            },
-            f"./Vendor/MSFT/NodeCache/MS%20DM%20Server/CacheVersion": {
-                "Format": "chr",
-                "Data": None
-            },
-            f"./Vendor/MSFT/NodeCache/MS%20DM%20Server/ChangedNodes": {
-                "Format": "chr",
-                "Data": None
-            },
-            f"./Device/Vendor/MSFT/DeviceManageability/Provider/MS%20DM%20Server/ConfigInfo": {
-                "Format": "chr",
-                "Data": None
-            },
-            f"./Device/Vendor/MSFT/DeviceManageability/Provider/WMI_Bridge_Server/ConfigInfo": {
-                "Format": "chr",
-                "Data": None
-            },
-            f"./Vendor/MSFT/Policy/Config/Security/RequireRetrieveHealthCertificateOnBoot": {
-                "Format": "chr",
-                "Data": None
-            },
-            
+
+        # This JSON DATA is used for the Checkin to verify compliance
+        # https://learn.microsoft.com/en-us/windows/client-management/mdm/policy-csp-devicelock
+
+
+        # This acts as a set of static responses we can use to reply, the idea is that some data from this is just static and doesn't need to be dynamic. 
+        static_responses_path = os.path.join(os.path.dirname(__file__), 'windows_syncml_static_responses.json')
+        with open(static_responses_path, 'r', encoding='utf-8') as f:
+            static_responses_raw = json.load(f)
+
+        responses = {
+            key: value[0] for key, 
+            value in static_responses_raw.items()
+        }
+
+        # These responses need to be dynamic as they can change.
+        dynamic_responses = {
             f"./Vendor/MSFT/DMClient/Provider/MS%20DM%20Server/ExchangeID": {
                 "Format": "chr",
                 "Data": self.uid
             },
-            f"./Device/Vendor/MSFT/DeviceManageability/Capabilities/CSPVersions": {
-                "Format": "chr",
-                "Data": '&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;&lt;DeviceManageability Version=&quot;com.microsoft/1.1/MDM/DeviceManageability&quot;&gt;&lt;Capabilities&gt;&lt;CSPVersions&gt;&lt;CSP Node=&quot;./DevDetail&quot; Version=&quot;1.2&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./DevInfo&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/AssignedAccess&quot; Version=&quot;4.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/BitLocker&quot; Version=&quot;5.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/ClientCertificateInstall&quot; Version=&quot;1.1&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/DMClient&quot; Version=&quot;1.5&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/DeclaredConfiguration&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/DeviceManageability&quot; Version=&quot;2.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/DeviceUpdateCenter&quot; Version=&quot;2.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/EnrollmentStatusTracking&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/EnterpriseAppVManagement&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/EnterpriseDataProtection&quot; Version=&quot;4.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/EnterpriseDesktopAppManagement&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/EnterpriseModernAppManagement&quot; Version=&quot;1.2&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/GPCSEWrapper&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/NetworkQoSPolicy&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/OfflineDomainJoin&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/OptionalFeatures&quot; Version=&quot;1.1&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/PassportForWork&quot; Version=&quot;1.6&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/Policy&quot; Version=&quot;10.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/PolicyManager/DeviceLock&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/PolicyManager/Security&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/Reboot&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/RemoteLock&quot; Version=&quot;1.1&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/RootCATrustedCertificates&quot; Version=&quot;1.1&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/VPNv2&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/WindowsAdvancedThreatProtection&quot; Version=&quot;1.2&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/WindowsDefenderApplicationGuard&quot; Version=&quot;1.4&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/WindowsIoT&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/WindowsLicensing&quot; Version=&quot;1.4&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./SyncML/DMAcc&quot; Version=&quot;1.1&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./SyncML/DMS&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/ActiveSync&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/ClientCertificateInstall&quot; Version=&quot;1.1&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/DMClient&quot; Version=&quot;1.5&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/DMSessionActions&quot; Version=&quot;1.1&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/DeclaredConfiguration&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/EMAIL2&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/EnrollmentStatusTracking&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/EnterpriseAppVManagement&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/EnterpriseDesktopAppManagement&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/EnterpriseModernAppManagement&quot; Version=&quot;1.2&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/GPCSEWrapper&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/NodeCache&quot; Version=&quot;1.2&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/PassportForWork&quot; Version=&quot;1.6&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/Policy&quot; Version=&quot;10.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/PolicyManager/DeviceLock&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/PolicyManager/Security&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/PrinterProvisioning&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/RootCATrustedCertificates&quot; Version=&quot;1.1&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/VPNv2&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/WiFi&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/ActiveSync&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/AppLocker&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/CMPolicy&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/CMPolicyEnterprise&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/CellularSettings&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/CertificateStore&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/CleanPC&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/DMClient&quot; Version=&quot;1.5&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/DMSessionActions&quot; Version=&quot;1.1&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/DeclaredConfiguration&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/Defender&quot; Version=&quot;1.2&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/DeviceLock&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/DeviceStatus&quot; Version=&quot;1.5&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/DeviceUpdate&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/DiagnosticLog&quot; Version=&quot;1.4&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/DynamicManagement&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/EMAIL2&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/EnterpriseAPN&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/EnterpriseModernAppManagement&quot; Version=&quot;1.2&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/Firewall&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/GPCSEWrapper&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/HealthAttestation&quot; Version=&quot;1.3&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/LanguagePackManagement&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/Maps&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/MultiSIM&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/NetworkProxy&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/NodeCache&quot; Version=&quot;1.2&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/Office&quot; Version=&quot;1.5&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/PassportForWork&quot; Version=&quot;1.6&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/Personalization&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/Policy/NetworkIsolation&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/PolicyManager/DeviceLock&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/PolicyManager/Security&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/RemoteFind&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/RemoteLock&quot; Version=&quot;1.1&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/RemoteWipe&quot; Version=&quot;1.1&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/Reporting&quot; Version=&quot;2.1&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/SUPL&quot; Version=&quot;1.2&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/SecureAssessment&quot; Version=&quot;1.1&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/SecurityPolicy&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/SharedPC&quot; Version=&quot;1.2&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/Storage&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/TPMPolicy&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/TenantLockdown&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/UnifiedWriteFilter&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/Update&quot; Version=&quot;1.1&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/VPNv2&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/WiFi&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/Win32AppInventory&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/WindowsAutopilot&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/WindowsLicensing&quot; Version=&quot;1.4&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/eUICCs&quot; Version=&quot;1.2&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/uefi&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_AppInstallJob&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_Application&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_ApplicationFramework&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_ApplicationSetting&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_BrowserSecurityZones&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_BrowserSettings&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_Certificate&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_CertificateEnrollment&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_Client&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_ConfigSetting&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_EASPolicy&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_MgmtAuthority&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_RemoteAppUserCookie&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_RemoteApplication&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_Restrictions&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_RestrictionsUser&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_SecurityStatus&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_SecurityStatusUser&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_SideLoader&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_Updates&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_VpnApplicationTrigger&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_VpnConnection&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_WNSChannel&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_WNSConfiguration&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_WebApplication&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_WirelessProfile&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_WirelessProfileXml&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MSFT_NetFirewallProfile&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MSFT_VpnConnection&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_DisplayConfiguration&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_EncryptableVolume&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_InfraredDevice&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_LocalTime&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_LogicalDisk&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_NetworkAdapter&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_NetworkAdapterConfiguration&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_OperatingSystem&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_PhysicalMemory&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_PnPDevice&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_PortableBattery&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_Processor&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_QuickFixEngineering&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_Registry&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_Service&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_Share&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_SystemBIOS&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_SystemEnclosure&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_TimeZone&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_UTCTime&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_WindowsUpdateAgentVersion&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/WpcAppOverride&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/WpcGameOverride&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/WpcGamesSettings&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/WpcRating&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/WpcRatingsDescriptor&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/WpcRatingsSystem&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/WpcSystemSettings&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/WpcURLOverride&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/WpcUserSettings&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/WpcWebSettings&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;/CSPVersions&gt;&lt;/Capabilities&gt;&lt;/DeviceManageability&gt;'
-            },            
             f"./DevDetail/Ext/Microsoft/LocalTime": {
                 "Format": "chr",
                 "Data": formatted_date
@@ -262,120 +343,40 @@ class Windows(Device):
                 "Format": "chr",
                 "Data": self.os_version
             },
-            f"./Vendor/MSFT/WindowsLicensing/Edition": {
-                "Format": "int",
-                "Data": "4"
-            },
             f"./Vendor/MSFT/Update/LastSuccessfulScanTime": {
                 "Format": "chr",
                 "Data": formatted_date
-            },        
-            f"./Vendor/MSFT/DeviceStatus/OS/Mode": {
-                "Format": "int",
-                "Data": "0"
             },
             f"./Vendor/MSFT/DMClient/Provider/MS%20DM%20Server/EntDMID": {
                 "Format": "chr",
                 "Data": self.deviceid
             },
-            f"./DevInfo/Man": {
-                "Format": "chr",
-                "Data": "Microsoft Corporation"
-            },
-            f"./Device/DevInfo/Lang": {
-                "Format": "chr",
-                "Data": "en-US"
-            },
-            f"./DevInfo/Lang": {
-                "Format": "chr",
-                "Data": "en-US"
-            },
-            f"./Device/DevDetail/Ext/Microsoft/OSPlatform": {
-                "Format": "chr",
-                "Data": "Windows 10 Enterprise"
-            },
             f"./Device/Vendor/MSFT/DeviceInformation/Version": {
                 "Format": "chr",
                 "Data": self.os_version
             },
-            f"./DevInfo/Mod": {
-                "Format": "chr",
-                "Data": "VMware7.1"
-            },     
-            f"./Vendor/MSFT/DeviceStatus/OS/Edition": {
-                "Format": "int",
-                "Data": "4"
-            },
-            f"./DevDetail/FwV": {
-                "Format": "chr",
-                "Data": "VMW71.00V.00000000.000.0000000000"
-            },  
-            f"./DevDetail/Ext/Microsoft/OSPlatform": {
-                "Format": "chr",
-                "Data": "Windows 10 Enterprise"
-            },    
             f"./DevDetail/Ext/Microsoft/DNSComputerName": {
                 "Format": "chr",
                 "Data": self.device_name
-            },                    
-            f"./Device/DevInfo/DmV": {
-                "Format": "chr",
-                "Data": "1.3"
-            },
-            f"./Device/DevDetail/HwV": {
-                "Format": "chr",
-                "Data": "Hyper-V UEFI Release v4.0"
-            },
-            f"./Device/DevDetail/DevTyp": {
-                "Format": "chr",
-                "Data": "VMware 7.1"
-            },
-            f"./Device/DevDetail/OEM": {
-                "Format": "chr",
-                "Data": "Microsoft Corporation"
-            },
-            f"./DevDetail/Ext/Microsoft/ProcessorArchitecture": {
-                "Format": "int",
-                "Data": "9"
-            },
-            f"./Vendor/MSFT/DMClient/HWDevID": {
-                "Format": "chr",
-                "Data": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-            },            
-            f"./Vendor/MSFT/DMClient/Provider/MS%20DM%20Server/PublisherDeviceID": {
-                "Format": "chr",
-                "Data": None
             },
             f"./Vendor/MSFT/DMClient/Provider/MS%20DM%20Server/EntDeviceName": {
                 "Format": "chr",
                 "Data": self.device_name
             },
-            f"./Vendor/MSFT/DMClient/Provider/MS%20DM%20Server/ForceAadToken": {
-                "Format": "int",
-                "Data": 1
-            },
-            f"./Device/Vendor/MSFT/BitLocker/Status/DeviceEncryptionStatus": {
-                "Format": "int",
-                "Data": 2
-            },                                    
-            f"./Vendor/MSFT/DMClient/Provider/MS%20DM%20Server/AADResourceID": {
-                "Format": "chr",
-                "Data": "https://manage.microsoft.com/"
-            },
             f"./DevDetail/Ext/DeviceHardwareData": {
                 "Format":"chr",
                 "Data":self.hwhash
             },
-            f"./Vendor/MSFT/WindowsAutopilot/HardwareMismatchRemediationData": {
-                "Format":"chr",
-                "Data":None
-            },
         }
-        if key in data:
-            return data[key]
+
+        responses.update(dynamic_responses)
+
+        if key in responses:
+            #print(f'Data Found: {key}:{data[key]}')
+            return responses[key]
         else:
             return None
-        
+
     def send_syncml(self, data, certpath, keypath):
         response = requests.post(
             url=self.checkin_url,
@@ -386,16 +387,31 @@ class Windows(Device):
             cert=(certpath, keypath)
             )
         return response.content
-    
+
     def download_apps(self, mdmpfx):
-        certpath = 'pytune_mdm.crt'
-        keypath = 'pytune_mdm.key'
-        extract_pfx(mdmpfx, certpath, keypath)
+        # Verify if the current self contains mdm_certpath or mdm_keypath, if we do, this means we are using the device config insted of the supplied PFX
+        if hasattr(self, 'mdm_certpath') and hasattr(self, 'mdm_keypath'):
+            self.logger.debug(f'Using MDM cert and key from device config for checkin')
+            certpath = self.mdm_certpath
+            keypath = self.mdm_keypath
+        elif hasattr(self, 'mdm_pfxpath'):
+            # In the impossible case we have the mdm_pfxpath set instead, extract from there
+            self.logger.debug(f'Using MDM PFX from device config for checkin')
+            filepath = os.path.join('device_config', self.device_name)
+            certpath = os.path.join(filepath, f'{self.device_name}_mdm_cert.pem')
+            keypath = os.path.join(filepath, f'{self.device_name}_mdm_key.key')
+            extract_pfx(self.mdm_pfxpath, certpath, keypath)
+        else:
+            # If we do not have the attribute set, use the supplied PFX to generate the cert and key
+            self.logger.debug(f'Using supplied MDM PFX for checkin')
+            certpath = f'{self.device_name}_mdm_cert.pem'
+            keypath = f'{self.device_name}_mdm_key.key'
+            extract_pfx(mdmpfx, certpath, keypath)
 
         ime = IME(self.device_name, certpath, keypath)
-        
         self.logger.info(f'Downloading scripts...')
         policies = ime.request_policy()
+        
         if len(policies) == 0:
             self.logger.error(f'Available scripts not found')
         else:
@@ -411,23 +427,37 @@ class Windows(Device):
 
                 if policy["EncryptedPolicyBody"]:
                     decrypted = ime.decrypt_encrypted_policy_body(encryptedPolicyBody)
-                    write_file(filepath=os.path.join(outdir, "app_scripts"), filename=f'policy_script_{policyID}_decrypted.ps1', content=decrypted)
+                    write_file(filepath=os.path.join(outdir, "app_scripts"), filename=f'policy_script_{policyID}_decrypted.txt', content=decrypted)
                     print(decrypted + '\n')
                 if policy["PolicyBody"]:
                     print(policyBody + '\n')
-                    write_file(filepath=os.path.join(outdir, "app_scripts"), filename=f'policy_script_{policyID}.ps1', content=policyBody)
+                    write_file(filepath=os.path.join(outdir, "app_scripts"), filename=f'policy_script_{policyID}.txt', content=policyBody)
 
 
         self.logger.info(f'Downloading win32apps...')
+
+        # Get Selected Apps
         apps = ime.get_selected_app()
+        apps2 = ime.get_request_application()
+
+        for app in apps2:
+            if app not in apps:
+                apps.append(app)
+        
         if len(apps) == 0:
             self.logger.error(f'Available intunewin file not found')
-
         for app in apps:
             app_name = app['Name']
+            InstallCommandLine = app['InstallCommandLine']
+            UninstallCommandLine = app['UninstallCommandLine']
+            DetectionRule = app['DetectionRule']
+            ExtendedRequirementRules = app['ExtendedRequirementRules']
+        
             content_info = ime.get_content_info(app)
             upload_location = json.loads(content_info["ContentInfo"])["UploadLocation"]
             decrypt_info = ime.decrypt_decryptinfo(content_info["DecryptInfo"])
+
+            write_file(filepath=os.path.join(outdir, "apps_intunewin"), filename=f'{app_name}_info.json', content=json.dumps(app))
 
             self.logger.alert(f'Found {app_name}, downloading...')
             self.logger.debug(f'Downloading: {upload_location} ...')
@@ -435,14 +465,35 @@ class Windows(Device):
             ime.download_intunewin(app_name, upload_location, decrypt_info)
             self.logger.success(f'Successfully downloaded {app_name}.intunewin!')
 
-
-        os.remove(certpath)
-        os.remove(keypath)
+        # If we have the MDM Certpath and keypath, we do not want to remove the files
+        if hasattr(self, 'mdm_certpath') and hasattr(self, 'mdm_keypath'):
+            self.logger.debug(f'Using existing MDM cert and key files, not removing them...')
+            return
+        else:
+            self.logger.debug(f'Removing temporary MDM cert and key files...')
+            os.remove(certpath)
+            os.remove(keypath)
+            return
 
     def download_remediation_scripts(self, mdmpfx):
-        certpath = 'pytune_mdm.crt'
-        keypath = 'pytune_mdm.key'
-        extract_pfx(mdmpfx, certpath, keypath)
+        # Verify if the current self contains mdm_certpath or mdm_keypath, if we do, this means we are using the device config insted of the supplied PFX
+        if hasattr(self, 'mdm_certpath') and hasattr(self, 'mdm_keypath'):
+            self.logger.debug(f'Using MDM cert and key from device config for checkin')
+            certpath = self.mdm_certpath
+            keypath = self.mdm_keypath
+        elif hasattr(self, 'mdm_pfxpath'):
+            # In the impossible case we have the mdm_pfxpath set instead, extract from there
+            self.logger.debug(f'Using MDM PFX from device config for checkin')
+            filepath = os.path.join('device_config', self.device_name)
+            certpath = os.path.join(filepath, f'{self.device_name}_mdm_cert.pem')
+            keypath = os.path.join(filepath, f'{self.device_name}_mdm_key.key')
+            extract_pfx(self.mdm_pfxpath, certpath, keypath)
+        else:
+            # If we do not have the attribute set, use the supplied PFX to generate the cert and key
+            self.logger.debug(f'Using supplied MDM PFX for checkin')
+            certpath = f'{self.device_name}_mdm_cert.pem'
+            keypath = f'{self.device_name}_mdm_key.key'
+            extract_pfx(mdmpfx, certpath, keypath)
 
         ime = IME(self.device_name, certpath, keypath)
 
@@ -475,8 +526,39 @@ class Windows(Device):
                     write_file(filepath=os.path.join(outdir, "remediation_scripts"), filename=f'{policyID}_detection_script_parameters.txt', content=json.dumps(policyParameters, indent=4))
                 i += 1
 
-        os.remove(certpath)
-        os.remove(keypath)
+        # If we have the MDM Certpath and keypath, we do not want to remove the files
+        if hasattr(self, 'mdm_certpath') and hasattr(self, 'mdm_keypath'):
+            self.logger.debug(f'Using existing MDM cert and key files, not removing them...')
+            return
+        else:
+            self.logger.debug(f'Removing temporary MDM cert and key files...')
+            os.remove(certpath)
+            os.remove(keypath)
+            return
+
+    def test(self, mdmpfx):
+        # Verify if the current self contains mdm_certpath or mdm_keypath, if we do, this means we are using the device config insted of the supplied PFX
+        if hasattr(self, 'mdm_certpath') and hasattr(self, 'mdm_keypath'):
+            self.logger.debug(f'Using MDM cert and key from device config for checkin')
+            certpath = self.mdm_certpath
+            keypath = self.mdm_keypath
+        elif hasattr(self, 'mdm_pfxpath'):
+            # In the impossible case we have the mdm_pfxpath set instead, extract from there
+            self.logger.debug(f'Using MDM PFX from device config for checkin')
+            filepath = os.path.join('device_config', self.device_name)
+            certpath = os.path.join(filepath, f'{self.device_name}_mdm_cert.pem')
+            keypath = os.path.join(filepath, f'{self.device_name}_mdm_key.key')
+            extract_pfx(self.mdm_pfxpath, certpath, keypath)
+        else:
+            # If we do not have the attribute set, use the supplied PFX to generate the cert and key
+            self.logger.debug(f'Using supplied MDM PFX for checkin')
+            certpath = f'{self.device_name}_mdm_cert.pem'
+            keypath = f'{self.device_name}_mdm_key.key'
+            extract_pfx(mdmpfx, certpath, keypath)
+
+        ime = IME(self.device_name, certpath, keypath)
+
+        scripts = ime.request_all()
 
 class IME():
     def __init__(self, device_name, certpath, keypath):
@@ -484,6 +566,55 @@ class IME():
         self.certpath = certpath
         self.keypath = keypath
 
+    def make_gateway_api_request(self, gateway_api, request_payload=None):
+        sidecar_url = self.resolve_service_address()
+        sessionid = str(uuid.uuid4())
+        data = self.create_request_data(sessionid, gateway_api, request_payload)
+
+        headers = {
+            'Content-Type': 'application/json',
+            'Prefer': 'return-content'
+        }
+
+        response = requests.put(
+            url=f'{sidecar_url}/SideCarGatewaySessions(\'{sessionid}\')?api-version=1.5',
+            cert=(self.certpath, self.keypath),
+            data=json.dumps(data),
+            headers=headers,
+        )
+
+        response_json = response.json()
+        """
+        Structure of JSON Response
+        {
+            "odata.metadata": "",
+            "odata.id": "",
+            "Key": "",
+            "SessionId": "",
+            "RequestContentType": "RequestApplication",
+            "RequestPayload": "",
+            "ResponseContentType": "PolicyResponse",
+            "ResponsePayload": "",
+            "ClientInfo": "",
+            "EnabledFlights": "DisableWin32V2AppProcessor",
+            "CheckinIntervalMinutes": 56,
+            "CheckinReason": "AgentRestart",
+            "CheckinReasonPayload": null,
+            "GenericWorkloadRequests": null,
+            "GenericWorkloadResponse": null
+        }
+        """
+
+        # I am abusing the typing here so we can do a selected response type for the payload when decompressing instead of hardcoding the decompression at the end of the request
+        if (response_json.get("RequestContentType") == "RequestApplication" or response_json.get("RequestContentType") == "GetSelectedApp"):
+            json_payload = response_json['ResponsePayload']
+            json_payload = (self.decompress_string(json_payload))
+        else:
+            json_payload = response_json['ResponsePayload']
+
+        return json_payload
+
+    # Requests
     def create_request_data(self, sessionid, gateway_api, request_payload=None):
         if request_payload == None:
             request_payload_str = "[]"
@@ -518,24 +649,41 @@ class IME():
             "CheckinIntervalMinutes": None,
             "GenericWorkloadRequests": None,
             "GenericWorkloadResponse": None,
+            # CheckinReason can be 
+            # - Unknown,
+		    # - UserLogOn,
+		    # - MaintenanceTimer,
+		    # - Notification,
+		    # - AgentRestart,
+		    # - APV2,
+		    # - OnDemand,
+		    # - ESP
             "CheckinReason": "AgentRestart",
             "CheckinReasonPayload": None
         }
         return data
 
     def resolve_service_address(self):
-        response = requests.get(
-            url='https://manage.microsoft.com/RestUserAuthLocationService/RestUserAuthLocationService/Certificate/ServiceAddresses',
-            cert=(self.certpath, self.keypath),
-            )
-        
-        services = response.json()[0]["Services"]
-        sidecar_url = None
-        for service in services:
-            if service['ServiceName'] == 'SideCarGatewayService':
-                sidecar_url = service['Url']
-        return sidecar_url
-    
+        # This acts as a simple cache so we don't need to keep calling to the same API endpoint multiple times
+        if (hasattr(self, 'spn_SideCarGatewayService')):
+            #print('Service principal endpoints already resolved, skipping...')
+            return self.spn_SideCarGatewayService
+        else:
+            #print('Resolving service principal endpoints...')
+            response = requests.get(
+                url='https://manage.microsoft.com/RestUserAuthLocationService/RestUserAuthLocationService/Certificate/ServiceAddresses',
+                cert=(self.certpath, self.keypath),
+                )
+
+            services = response.json()[0]["Services"]
+            sidecar_url = None
+            for service in services:
+                if service['ServiceName'] == 'SideCarGatewayService':
+                    sidecar_url = service['Url']
+            setattr(self, 'spn_SideCarGatewayService', sidecar_url)
+            return self.spn_SideCarGatewayService
+
+    # Utils
     def decrypt_decryptinfo(self, decryptinfo):
         start = decryptinfo.find('<EncryptedContent>') + len('<EncryptedContent>')
         end = decryptinfo.find('</EncryptedContent>')
@@ -548,7 +696,7 @@ class IME():
         decrypt_info = json.loads(decrypted_content)
         os.remove(smime_file)
         return decrypt_info
-    
+
     def decrypt_encrypted_policy_body(self, encryptedPolicyBody):
         start = encryptedPolicyBody.find('<EncryptedContent>') + len('<EncryptedContent>')
         end = encryptedPolicyBody.find('</EncryptedContent>')
@@ -568,52 +716,21 @@ class IME():
             decompressed_data = gzip_stream.read(data_length)
         
         return decompressed_data.decode('utf-8')
-    
+
+    # Abstracted Requests
+    def request_policy(self):
+        response_payload = self.make_gateway_api_request(gateway_api = "PolicyRequest")
+        return json.loads(response_payload)
+
     def get_selected_app(self):
-
-        sidecar_url = self.resolve_service_address()
-        sessionid = str(uuid.uuid4())
-        data = self.create_request_data(sessionid, "GetSelectedApp")
-
-        headers = {
-            'Content-Type': 'application/json',
-            'Prefer': 'return-content',
-        }
-
-        response = requests.put(
-            url=f'{sidecar_url}/SideCarGatewaySessions(\'{sessionid}\')?api-version=1.5',
-            cert=(self.certpath, self.keypath),
-            data=json.dumps(data),
-            headers=headers,
-            )
-        
-        response_payload = response.json()['ResponsePayload']
-        decompressed_string = self.decompress_string(response_payload)
-        return json.loads(decompressed_string)
+        response_payload = self.make_gateway_api_request(gateway_api = "GetSelectedApp")
+        return json.loads(response_payload)
     
     def get_remediation_scripts(self):
-
-        sidecar_url = self.resolve_service_address()
-        sessionid = str(uuid.uuid4())
-        data = self.create_request_data(sessionid, "GetScript")
-
-        headers = {
-            'Content-Type': 'application/json; charset=utf-8',
-            'Prefer': 'return-content',
-        }
-
-        response = requests.put(
-            url=f'{sidecar_url}/SideCarGatewaySessions(\'{sessionid}\')?api-version=1.5',
-            cert=(self.certpath, self.keypath),
-            data=json.dumps(data),
-            headers=headers,
-            )
-        
-        response_payload = response.json()['ResponsePayload']
+        response_payload = self.make_gateway_api_request(gateway_api = "GetScript")
         return json.loads(response_payload)
 
     def get_content_info(self, assigned_app):
-        sidecar_url = self.resolve_service_address()
         with open(self.certpath, 'rb') as pem_file:
             pem_data = pem_file.read()
 
@@ -639,25 +756,13 @@ class IME():
                 "ManagedInstallerStatus": 1,
                 "ApplicationEnforcement": 0
             }
-        sessionid = str(uuid.uuid4())
-        data = self.create_request_data(sessionid, "GetContentInfo", request_payload)
 
-        headers = {
-            'Content-Type': 'application/json',
-            'Prefer': 'return-content'
-        }
+        response_payload = self.make_gateway_api_request(gateway_api = "GetContentInfo", request_payload=request_payload)
 
-        response = requests.put(
-            url=f'{sidecar_url}/SideCarGatewaySessions(\'{sessionid}\')?api-version=1.5',
-            cert=(self.certpath, self.keypath),
-            data=json.dumps(data),
-            headers=headers,
-            )    
-
-        response_payload = response.json()["ResponsePayload"]
         return json.loads(response_payload)
 
     def download_intunewin(self, appname, upload_location, decrypt_info):
+        # Note to self, this is a standard request
         response = requests.get(url=upload_location)
 
         if decrypt_info['ProfileIdentifier'] == 'NoEncryption':
@@ -671,24 +776,73 @@ class IME():
         
         write_file(filepath=os.path.join(outdir, "apps_intunewin"), filename=f'{appname}.intunewin', content=data)
 
-    def request_policy(self):
+    def get_request_application(self):
+        # RequestApplication is another call to the Sidecar API to get applications, based on the debug responses;
+        # "RequestApplication" is "Requesting required apps" 
+        # "GetAvailableApp" which is "Requesting available apps only"
+        # "GetSelectedApp", which is "Requesting selected apps for ESP"         
+        response_payload = self.make_gateway_api_request(gateway_api = "RequestApplication")
+        return json.loads(response_payload)
+
+    def request_all(self):
+        # This is a test function to verify if there are any other ways I can use different sidecar requests
+        sidecar_apis = [
+            #'ApplicationInventory',
+            #'DeviceQueryResult',
+            #'GenericPolicyResponse',
+            #'GetAppProvisioning',
+            #'GetAvailableApp',
+            #'GetBrand',
+            #'GetContentInfo',
+            #'GetDeviceProvisioningScripts',
+            #'GetFlightingTags'
+            #'GetMockApp',
+            #'GetProvisioningContentInfo',
+            #'GetScript',
+            'GetSelectedApp',
+            #'GetSideCarGenericPolicies',
+            #'GetWin10SUnlockTokenAndPolicy',
+            #'GetWin10SUnlockTokenAndPolicyReport',
+            #'GetWinUnlockTokenAndPolicy',
+            #'PolicyRequest',
+            #'PolicyResult',
+            #'ReportDeviceProvisioningScriptResults',
+            'RequestApplication',
+            #'Win32AppResult',
+        ]
+
         sidecar_url = self.resolve_service_address()
         if sidecar_url == None:
             self.logger.error(f'SidecCarGatewayService not found')
             return
 
-        sessionid = str(uuid.uuid4())
-        data = self.create_request_data(sessionid, "PolicyRequest")
-        headers = {
-            'Content-Type': 'application/json',
-            'Prefer': 'return-content'
-        }
+        for i in sidecar_apis:
+            print(f'Requesting {i} ...')
+            sessionid = str(uuid.uuid4())
+            data = self.create_request_data(sessionid, i)
+            headers = {
+                'Content-Type': 'application/json',
+                'Prefer': 'return-content'
+            }
 
-        response = requests.put(
-            url=f'{sidecar_url}/SideCarGatewaySessions(\'{sessionid}\')?api-version=1.5',
-            cert=(self.certpath, self.keypath),
-            data=json.dumps(data),
-            headers=headers,
-            )    
-        response_payload = response.json()["ResponsePayload"]
-        return json.loads(response_payload)
+            response = requests.put(
+                url=f'{sidecar_url}/SideCarGatewaySessions(\'{sessionid}\')?api-version=1.5',
+                cert=(self.certpath, self.keypath),
+                data=json.dumps(data),
+                headers=headers,
+            )
+
+            response_json = response.json()
+            if response_json.get("RequestContentType") == "RequestApplication" or response_json.get("RequestContentType") == "GetSelectedApp":
+                #print('Decompressing')
+
+                json_payload = response_json['ResponsePayload']
+                decompressed_string = json.loads(self.decompress_string(json_payload))
+                for i in decompressed_string:
+                    for key in i:
+                        print(f' - {key}: {i[key]}')
+                    #print(f' - {i["Name"]} (ID: {i["Id"]})')
+
+                #print(json.dumps(decompressed_string, indent=4))
+
+            #print(json.dumps(response_json, indent=4))

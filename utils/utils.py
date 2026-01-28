@@ -125,7 +125,7 @@ def renew_token(refresh_token, client_id, scope, proxy):
         'refresh_token':refresh_token,
         'scope':scope
     }
-    
+
     response = requests.post(
         "https://login.microsoftonline.com/common/oAuth2/v2.0/token",
         data=data,
@@ -271,7 +271,7 @@ def decrypt_smime_file(filename, keypath):
     result = subprocess.run(f'cat {filename} | openssl cms -decrypt -inkey {keypath}', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     return result.stdout.decode('utf-8')
 
-def aes_decrypt(key, iv, content):    
+def aes_decrypt(key, iv, content):
     cipher = Cipher(algorithms.AES(base64.b64decode(key)), modes.CBC(base64.b64decode(iv)), backend=default_backend())
     decryptor = cipher.decryptor()
     decrypted_data = decryptor.update(content) + decryptor.finalize()

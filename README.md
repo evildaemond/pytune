@@ -34,7 +34,7 @@ usage: pytune.py [-h] [-x PROXY] [-v] {entra_join,entra_delete,enroll_intune,che
  \ \_\    \/\_____\    \ \_\  \ \_____\  \ \_\\"\_\  \ \_____\ 
   \/_/     \/_____/     \/_/   \/_____/   \/_/ \/_/   \/_____/ 
                                                                
-      Faking a device to Microsft Intune (version:1.2)
+      Faking a device to Microsft Intune (version:1.3)
 
 
 options:
@@ -43,15 +43,17 @@ options:
 subcommands:
   pytune commands
 
-  {entra_join,entra_delete,enroll_intune,checkin,retire_intune,check_compliant,download_apps,get_remediations}
+  {entra_join,entra_delete,enroll_intune,checkin,retire_intune,download_apps,get_remediations,auto_create,get_info,show_configs}
     entra_join          join device to Entra ID
     entra_delete        delete device from Entra ID
     enroll_intune       enroll device to Intune
     checkin             checkin to Intune
     retire_intune       retire device from Intune
-    check_compliant     check compliant status
     download_apps       download available win32apps and scripts (only Windows supported since I'm lazy)
     get_remediations    download available remediation scripts (only Windows supported since I'm lazy)
+    auto_create         Automatically create, enroll, checkin, and return compliance of a device
+    get_info            Get Device Info
+    show_configs        Show Device Configurations
 ```
 
 ### Enroll a fake device
@@ -81,10 +83,12 @@ $  python3 pytune.py enroll_intune -o Windows -d Windows_pytune -c Windows_pytun
 
 Intune MDM device ceritificate, `{device_name}_mdm.pfx`, is generated once the device is enrolled to Intune.
 
+
 ### Steal device configuration
 
-You can start check-in with `checkin` command.
-This exchanges information between device and Intune management server.
+You can start check-in with `checkin` command. This exchanges information between device and Intune management server.
+
+Appending the flag `-s, --stdout` will outpuit the results to console, the flag `--dirout` will add it to the loot directory.
 
 ```
 $ python3 pytune.py checkin -o Windows -d Windows_pytune -c Windows_pytune.pfx -m Windows_pytune_mdm.pfx -u testuser@*******.onmicrosoft.com -p ***********
@@ -134,26 +138,80 @@ This could be a VPN client installer file that can be used for initial access.
 ### Query compliance state of your device
 
 The device's compliance state is evaluated through the information sent to Intune during the check-in.
-`check_compliant` command queies the compliance state of the fake device and tell you which settings are not compliant with the company's policy
+`get_info` command queies the compliance state of the fake device and tell you which settings are not compliant with the company's policy
 
 ```
-$ python3 pytune.py check_compliant -c Windows_pytune.pfx -u testuser@*******.onmicrosoft.com -p ***********                                    
-[*] resolved IWservice url: https://fef.msuc06.manage.microsoft.com/TrafficGateway/TrafficRoutingService/IWService/StatelessIWService
-[*] resolved token renewal url: https://fef.msuc06.manage.microsoft.com/OAuth/StatelessOAuthService/OAuthProxy/
-[-] Windows_pytune is not compliant
-[!] non-compliant reason #1:
- - SettingID: Firewall_Enabled
- - Title: Device must have firewall enabled.
- - Description: This device must have the firewall enabled. Contact your IT administrator for help.
-[!] non-compliant reason #2:
- - SettingID: SpecificationVersionForCompliance
- - Title: A Trusted Platform Module (TPM) is required
- - ExpectedValue: Equals True
- - Description: This device does not have an active TPM present.
+python3 pytune.py get_info -c Windows_pytune.pfx -u testuser@*******.onmicrosoft.com -p ***********
+                         Device Information
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Key                       ┃ Value                                ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Device Official Name      │ DESKTOP-CZV8PTMY                     │
+│ Device Key                │ f5b36d38-0e70-476c-b9e0-e502959cde5c │
+│ Device AadId              │ b267087f-1d69-4140-88a9-bbd6369bb0d5 │
+│ Device HWID               │ None                                 │
+│ Manufacturer              │                                      │
+│ Model                     │ Surface Laptop Go                    │
+│ Operating System          │ Windows                              │
+│ OS Version                │ 10.0.19045.2006                      │
+│ OS OSSubtype              │ None                                 │
+│ Architecture              │ AMD64                                │
+├───────────────────────────┼──────────────────────────────────────┤
+│ Management Type           │ Mdm                                  │
+│ Management Agent          │ Mdm                                  │
+│ Enrollment Type           │ 10                                   │
+├───────────────────────────┼──────────────────────────────────────┤
+│ Created Date              │ 2026-01-09T05:43:26.3054117Z         │
+│ Last Contact              │ 2026-01-20T01:23:43.8587743Z         │
+│ Last Contact Notification │ 0001-01-01T00:00:00Z                 │
+│ In Grace Period Until     │ 2026-01-09T05:47:14.4859Z            │
+├───────────────────────────┼──────────────────────────────────────┤
+│ Compliance State          │ Noncompliant                         │
+│ Is Compliant In Graph     │ False                                │
+└───────────────────────────┴──────────────────────────────────────┘
+                                                          Non-compliant Reasons
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ SettingID                       ┃ Expected Value                  ┃ Reason                          ┃ Details                          ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Device_Password_Required        │                                 │ Set a device password           │ Devices must be protected by a   │
+│                                 │                                 │                                 │ password.                        │
+├─────────────────────────────────┼─────────────────────────────────┼─────────────────────────────────┼──────────────────────────────────┤
+│ Device_Password_MinimumLength   │                                 │ Set a longer device password    │ An error occurred while checking │
+│                                 │                                 │                                 │ settings on your device. Wait a  │
+│                                 │                                 │                                 │ few minutes, then try again. If  │
+│                                 │                                 │                                 │ this problem persists, contact   │
+│                                 │                                 │                                 │ your company support.            │
+├─────────────────────────────────┼─────────────────────────────────┼─────────────────────────────────┼──────────────────────────────────┤
+│ DefenderEnabled                 │                                 │ Enable Windows Defender         │ This device must have Windows    │
+│                                 │                                 │ Antimalware                     │ Defender Antimalware enabled.    │
+│                                 │                                 │                                 │ Contact your company support for │
+│                                 │                                 │                                 │ help.                            │
+├─────────────────────────────────┼─────────────────────────────────┼─────────────────────────────────┼──────────────────────────────────┤
+│ SpecificationVersionForComplia… │ Equals True                     │ A Trusted Platform Module (TPM) │ This device does not have an     │
+│                                 │                                 │ is required                     │ active TPM present.              │
+├─────────────────────────────────┼─────────────────────────────────┼─────────────────────────────────┼──────────────────────────────────┤
+│ Device_Contact_Error            │ Expected no contact errors. In  │ Compliance setting in error     │ Intune couldn’t determine your   │
+│                                 │ error since: 2026-01-09         │ state for more than 7 days.     │ device’s compliance with one or  │
+│                                 │ 05:47:13Z                       │                                 │ more settings for at least 7     │
+│                                 │                                 │                                 │ days. Sometimes these errors are │
+│                                 │                                 │                                 │ resolved by restarting your      │
+│                                 │                                 │                                 │ device and selecting Check       │
+│                                 │                                 │                                 │ compliance. If you do this and   │
+│                                 │                                 │                                 │ get this message again, contact  │
+│                                 │                                 │                                 │ your organization’s support.     │
+└─────────────────────────────────┴─────────────────────────────────┴─────────────────────────────────┴──────────────────────────────────┘
 ```
 
-You can modify what settings are sent as a fake device, for example, in `device/windows.py`.
-Then, re-enroll and check-in again so that you can get a fake device being marked as compliant.
+You can modify what settings are sent as a fake device, for example, in `device/linux.py` or for Windows, in the `windows_syncml_static_responses.json` file. Then, re-enroll and check-in again so that you can get a fake device being marked as compliant.
+
+### Auto-Create a device
+
+The previous commands be semi-automated with the `auto_create` subcommand, which will attempt to create a device and check it in, then return the compliance. 
+Changes to the SyncML responses mean you automatically "spoof" the remediation of actions with the device, responding with the correct responses.
+
+Once the check-in is complete and the Device and Compliance information has been returned, the configuration will be saved to the `device_config` folder, to be used with other commands via the `-dc, --device_config` flag
+
+To find all current device configs avalible for use, use the `show_configs` arg
 
 ### Leak domain computer credentials
 

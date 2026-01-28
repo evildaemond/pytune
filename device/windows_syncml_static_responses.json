@@ -1,0 +1,278 @@
+{
+    "./DevInfo/DmV": [
+        {
+            "Format": "int",
+            "Data": "1.3"
+        }
+    ],
+    "./Vendor/MSFT/NodeCache/MS%20DM%20Server": [
+        {
+            "Format": "chr",
+            "Data": "CacheVersion/Nodes/ChangedNodes/ChangedNodesData"
+        }
+    ],
+    "./Vendor/MSFT/NodeCache/MS%20DM%20Server/CacheVersion": [
+        {
+            "Format": "chr",
+            "Data": "None"
+        }
+    ],
+    "./Vendor/MSFT/NodeCache/MS%20DM%20Server/ChangedNodes": [
+        {
+            "Format": "chr",
+            "Data": "None"
+        }
+    ],
+    "./Device/Vendor/MSFT/DeviceManageability/Provider/MS%20DM%20Server/ConfigInfo": [
+        {
+            "Format": "chr",
+            "Data": "None"
+        }
+    ],
+    "./Device/Vendor/MSFT/DeviceManageability/Provider/WMI_Bridge_Server/ConfigInfo": [
+        {
+            "Format": "chr",
+            "Data": "None"
+        }
+    ],
+    "./Vendor/MSFT/Policy/Config/Security/RequireRetrieveHealthCertificateOnBoot": [
+        {
+            "Format": "chr",
+            "Data": "None"
+        }
+    ],
+    "./Device/Vendor/MSFT/DeviceManageability/Capabilities/CSPVersions": [
+        {
+            "Format": "chr",
+            "Data": "&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;&lt;DeviceManageability Version=&quot;com.microsoft/1.1/MDM/DeviceManageability&quot;&gt;&lt;Capabilities&gt;&lt;CSPVersions&gt;&lt;CSP Node=&quot;./DevDetail&quot; Version=&quot;1.2&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./DevInfo&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/AssignedAccess&quot; Version=&quot;4.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/BitLocker&quot; Version=&quot;5.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/ClientCertificateInstall&quot; Version=&quot;1.1&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/DMClient&quot; Version=&quot;1.5&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/DeclaredConfiguration&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/DeviceManageability&quot; Version=&quot;2.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/DeviceUpdateCenter&quot; Version=&quot;2.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/EnrollmentStatusTracking&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/EnterpriseAppVManagement&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/EnterpriseDataProtection&quot; Version=&quot;4.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/EnterpriseDesktopAppManagement&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/EnterpriseModernAppManagement&quot; Version=&quot;1.2&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/GPCSEWrapper&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/NetworkQoSPolicy&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/OfflineDomainJoin&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/OptionalFeatures&quot; Version=&quot;1.1&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/PassportForWork&quot; Version=&quot;1.6&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/Policy&quot; Version=&quot;10.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/PolicyManager/DeviceLock&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/PolicyManager/Security&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/Reboot&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/RemoteLock&quot; Version=&quot;1.1&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/RootCATrustedCertificates&quot; Version=&quot;1.1&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/VPNv2&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/WindowsAdvancedThreatProtection&quot; Version=&quot;1.2&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/WindowsDefenderApplicationGuard&quot; Version=&quot;1.4&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/WindowsIoT&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Device/Vendor/MSFT/WindowsLicensing&quot; Version=&quot;1.4&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./SyncML/DMAcc&quot; Version=&quot;1.1&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./SyncML/DMS&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/ActiveSync&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/ClientCertificateInstall&quot; Version=&quot;1.1&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/DMClient&quot; Version=&quot;1.5&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/DMSessionActions&quot; Version=&quot;1.1&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/DeclaredConfiguration&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/EMAIL2&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/EnrollmentStatusTracking&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/EnterpriseAppVManagement&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/EnterpriseDesktopAppManagement&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/EnterpriseModernAppManagement&quot; Version=&quot;1.2&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/GPCSEWrapper&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/NodeCache&quot; Version=&quot;1.2&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/PassportForWork&quot; Version=&quot;1.6&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/Policy&quot; Version=&quot;10.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/PolicyManager/DeviceLock&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/PolicyManager/Security&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/PrinterProvisioning&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/RootCATrustedCertificates&quot; Version=&quot;1.1&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/VPNv2&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./User/Vendor/MSFT/WiFi&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/ActiveSync&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/AppLocker&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/CMPolicy&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/CMPolicyEnterprise&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/CellularSettings&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/CertificateStore&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/CleanPC&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/DMClient&quot; Version=&quot;1.5&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/DMSessionActions&quot; Version=&quot;1.1&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/DeclaredConfiguration&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/Defender&quot; Version=&quot;1.2&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/DeviceLock&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/DeviceStatus&quot; Version=&quot;1.5&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/DeviceUpdate&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/DiagnosticLog&quot; Version=&quot;1.4&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/DynamicManagement&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/EMAIL2&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/EnterpriseAPN&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/EnterpriseModernAppManagement&quot; Version=&quot;1.2&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/Firewall&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/GPCSEWrapper&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/HealthAttestation&quot; Version=&quot;1.3&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/LanguagePackManagement&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/Maps&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/MultiSIM&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/NetworkProxy&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/NodeCache&quot; Version=&quot;1.2&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/Office&quot; Version=&quot;1.5&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/PassportForWork&quot; Version=&quot;1.6&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/Personalization&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/Policy/NetworkIsolation&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/PolicyManager/DeviceLock&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/PolicyManager/Security&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/RemoteFind&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/RemoteLock&quot; Version=&quot;1.1&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/RemoteWipe&quot; Version=&quot;1.1&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/Reporting&quot; Version=&quot;2.1&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/SUPL&quot; Version=&quot;1.2&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/SecureAssessment&quot; Version=&quot;1.1&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/SecurityPolicy&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/SharedPC&quot; Version=&quot;1.2&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/Storage&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/TPMPolicy&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/TenantLockdown&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/UnifiedWriteFilter&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/Update&quot; Version=&quot;1.1&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/VPNv2&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/WiFi&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/Win32AppInventory&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/WindowsAutopilot&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/WindowsLicensing&quot; Version=&quot;1.4&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/eUICCs&quot; Version=&quot;1.2&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./Vendor/MSFT/uefi&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_AppInstallJob&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_Application&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_ApplicationFramework&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_ApplicationSetting&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_BrowserSecurityZones&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_BrowserSettings&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_Certificate&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_CertificateEnrollment&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_Client&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_ConfigSetting&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_EASPolicy&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_MgmtAuthority&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_RemoteAppUserCookie&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_RemoteApplication&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_Restrictions&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_RestrictionsUser&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_SecurityStatus&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_SecurityStatusUser&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_SideLoader&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_Updates&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_VpnApplicationTrigger&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_VpnConnection&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_WNSChannel&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_WNSConfiguration&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_WebApplication&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_WirelessProfile&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MDM_WirelessProfileXml&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MSFT_NetFirewallProfile&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/MSFT_VpnConnection&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_DisplayConfiguration&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_EncryptableVolume&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_InfraredDevice&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_LocalTime&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_LogicalDisk&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_NetworkAdapter&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_NetworkAdapterConfiguration&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_OperatingSystem&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_PhysicalMemory&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_PnPDevice&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_PortableBattery&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_Processor&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_QuickFixEngineering&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_Registry&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_Service&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_Share&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_SystemBIOS&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_SystemEnclosure&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_TimeZone&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_UTCTime&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/Win32_WindowsUpdateAgentVersion&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/WpcAppOverride&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/WpcGameOverride&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/WpcGamesSettings&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/WpcRating&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/WpcRatingsDescriptor&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/WpcRatingsSystem&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/WpcSystemSettings&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/WpcURLOverride&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/WpcUserSettings&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;CSP Node=&quot;./cimv2/WpcWebSettings&quot; Version=&quot;1.0&quot;&gt;&lt;/CSP&gt;&lt;/CSPVersions&gt;&lt;/Capabilities&gt;&lt;/DeviceManageability&gt;"
+        }
+    ],
+    "./Vendor/MSFT/WindowsLicensing/Edition": [
+        {
+            "Format": "int",
+            "Data": "4"
+        }
+    ],
+    "./Vendor/MSFT/DeviceStatus/OS/Mode": [
+        {
+            "Format": "int",
+            "Data": "0"
+        }
+    ],
+    "./DevInfo/Man": [
+        {
+            "Format": "chr",
+            "Data": "Microsoft Corporation"
+        }
+    ],
+    "./DevInfo/Lang": [
+        {
+            "Format": "chr",
+            "Data": "en-US"
+        }
+    ],
+    "./Device/DevDetail/Ext/Microsoft/OSPlatform": [
+        {
+            "Format": "chr",
+            "Data": "Windows 10 Enterprise"
+        }
+    ],
+    "./DevInfo/Mod": [
+        {
+            "Format": "chr",
+            "Data": "Surface Laptop Go"
+        }
+    ],
+    "./Vendor/MSFT/DeviceStatus/OS/Edition": [
+        {
+            "Format": "int",
+            "Data": "4"
+        }
+    ],
+    "./DevDetail/FwV": [
+        {
+            "Format": "chr",
+            "Data": "VMW71.00V.00000000.000.0000000000"
+        }
+    ],
+    "./DevDetail/Ext/Microsoft/OSPlatform": [
+        {
+            "Format": "chr",
+            "Data": "Windows 10 Enterprise"
+        }
+    ],
+    "./Device/DevInfo/DmV": [
+        {
+            "Format": "chr",
+            "Data": "1.3"
+        }
+    ],
+    "./Device/DevDetail/HwV": [
+        {
+            "Format": "chr",
+            "Data": "Hyper-V UEFI Release v4.0"
+        }
+    ],
+    "./Device/DevDetail/DevTyp": [
+        {
+            "Format": "chr",
+            "Data": "VMware 7.1"
+        }
+    ],
+    "./Device/DevDetail/OEM": [
+        {
+            "Format": "chr",
+            "Data": "Microsoft Corporation"
+        }
+    ],
+    "./DevDetail/Ext/Microsoft/ProcessorArchitecture": [
+        {
+            "Format": "int",
+            "Data": "9"
+        }
+    ],
+    "./Vendor/MSFT/DMClient/HWDevID": [
+        {
+            "Format": "chr",
+            "Data": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        }
+    ],
+    "./Vendor/MSFT/DMClient/Provider/MS%20DM%20Server/PublisherDeviceID": [
+        {
+            "Format": "chr",
+            "Data": "None"
+        }
+    ],
+    "./Vendor/MSFT/DMClient/Provider/MS%20DM%20Server/ForceAadToken": [
+        {
+            "Format": "int",
+            "Data": 1
+        }
+    ],
+    "./Device/Vendor/MSFT/BitLocker/Status/DeviceEncryptionStatus": [
+        {
+            "Format": "int",
+            "Data": 0
+        }
+    ],
+    "./Vendor/MSFT/DMClient/Provider/MS%20DM%20Server/AADResourceID": [
+        {
+            "Format": "chr",
+            "Data": "https://manage.microsoft.com/"
+        }
+    ],
+    "./Vendor/MSFT/WindowsAutopilot/HardwareMismatchRemediationData": [
+        {
+            "Format": "chr",
+            "Data": "None"
+        }
+    ],
+    "./Vendor/MSFT/Policy/Config/DeviceLock/DevicePasswordEnabled": [
+        {
+            "Format": "int",
+            "Data": "0"
+        }
+    ],
+    "./Vendor/MSFT/Policy/Config/DeviceLock/MinDevicePasswordLength": [
+        {
+            "Format": "int",
+            "Data": "6"
+        }
+    ],
+    "./Vendor/MSFT/DeviceStatus/TPM/SpecificationVersion": [
+        {
+            "Format": "chr",
+            "Data": "2.0"
+        }
+    ],
+    "./Vendor/MSFT/BitLocker/RequireDeviceEncryption": [
+        {
+            "Format": "int",
+            "Data": 8
+        }
+    ],
+    "./Vendor/MSFT/Defender/Health/ProductStatus": [
+        {
+            "Format": "int",
+            "Data": 0
+        }
+    ],
+    "./Vendor/MSFT/Defender/Health/ComputerState": [
+        {
+            "Format": "int",
+            "Data": 0
+        }
+    ],
+    "./Vendor/MSFT/Defender/Health/TamperProtectionEnabled": [
+        {
+            "Format": "bool",
+            "Data": "true"
+        }
+    ],
+    "./Vendor/MSFT/Defender/Health/DefenderEnabled": [
+        {
+            "Format": "bool",
+            "Data": "true"
+        }
+    ],
+    "./Vendor/MSFT/Defender/Health/RtpEnabled": [
+        {
+            "Format": "bool",
+            "Data": "true"
+        }
+    ],
+    "./Vendor/MSFT/Defender/Health/NisEnabled": [
+        {
+            "Format": "bool",
+            "Data": "true"
+        }
+    ],
+    "./Vendor/MSFT/Defender/Health/QuickScanOverdue": [
+        {
+            "Format": "bool",
+            "Data": "false"
+        }
+    ],
+    "./Vendor/MSFT/Defender/Health/FullScanOverdue": [
+        {
+            "Format": "bool",
+            "Data": "false"
+        }
+    ],
+    "./Vendor/MSFT/Defender/Health/SignatureOutOfDate": [
+        {
+            "Format": "bool",
+            "Data": "false"
+        }
+    ],
+    "./Vendor/MSFT/Defender/Health/RebootRequired": [
+        {
+            "Format": "bool",
+            "Data": "false"
+        }
+    ],
+    "./Vendor/MSFT/Defender/Health/FullScanRequired": [
+        {
+            "Format": "bool",
+            "Data": "false"
+        }
+    ],
+    "./Vendor/MSFT/Defender/Health/EngineVersion": [
+        {
+            "Format": "chr",
+            "Data": "1.1.17400.5"
+        }
+    ],
+    "./Vendor/MSFT/Defender/Health/SignatureVersion": [
+        {
+            "Format": "chr",
+            "Data": "1.323.410.0"
+        }
+    ],
+    "./Vendor/MSFT/Defender/Health/DefenderVersion": [
+        {
+            "Format": "chr",
+            "Data": "4.18.2008.9"
+        }
+    ]
+}
